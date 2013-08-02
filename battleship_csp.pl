@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use 5.14.0;
 use POSIX;
+use Data::Dumper;
 
 my $DEBUG = 1;
 
@@ -122,19 +123,63 @@ sub get_position_neighbours {
 	return sort keys %neighbours if keys %neighbours > 1; # List of parameters
 	return first keys %neighbours; # Only one param
 }
-# Check if all constraints are satisfied
-# Input list of chosesen fields
-sub check_contraints {
 
+sub domain_for_used_values {
+	my @used_values = (@_);
+
+	my %variable_pool;
+	for my $domain_variable (map {get_sizer_domain_list($_)} ('s','t','u','w')){
+		$variable_pool{$domain_variable} = 1;
+	}
+
+	my %value_dependency;
+	for my $value (keys %variable_pool){
+		my %related_values = ();
+		for my $constrained_number ( get_position_neighbours get_value_board_postions($value)) {
+			$related_values{$board_definition[$constrained_number]} = 1;	
+		}
+		#$value_dependency{$value} = [grep {! m/$value/} keys %related_values];
+		$value_dependency{$value} = [keys %related_values];
+	}
+	for my $used_value (@used_values) {
+		for my $constrained_value (@{$value_dependency{$used_value}}){
+			$variable_pool{$constrained_value} = 0;
+		}
+	}
+	return grep {$variable_pool{$_}} keys %variable_pool;
+	
+}
+sub domain_for_variable {
+	my ($variable, @values) = (@_);
+	return grep {m/$variable/} @values
 }
 
-my %variable_pool;
-for my $domain_variable (map {get_sizer_domain_list($_)} ('s','t','u','w')){
-	$variable_pool{$domain_variable} = 1;
+#say join(':', domain_for_variable('w',domain_for_used_values('s1')));
+#say join(':', domain_for_used_values('w1'));
+
+#say join(":", grep {$variable_pool{$_}} keys %variable_pool);
+
+# Main logic
+# Select unasigned variable (MCV) Most constrained variable
+# Select value for that variable (LCV) Least constraining value
+# if now value possible backtrack.
+#
+
+sub assigment_step {
+	my @variables = (@_);
+	my @assigned_variables  = grep {!m/?/} @variables;
+	my @unasigned_variables = grep { m/?/} @variables;
 }
 
-say join(":", grep {$variable_pool{$_}} keys %variable_pool);
+sub solve_the_puzzle {
+	my @variables;
+	push @variables, "w?" for (1 .. $w_count); 
+	push @variables, "u?" for (1 .. $u_count); 
+	push @variables, "t?" for (1 .. $t_count); 
+	push @variables, "s?" for (1 .. $s_count); 
 
+	say "@variables";
+}
 __END__
 
 =head1 Battleship CSP solver
