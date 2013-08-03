@@ -1,12 +1,12 @@
-#!/bin/perl
+#!/bin/env perl
 
 use strict;
 use warnings;
-use 5.14.0;
+use 5.12.0;
 use POSIX;
 use Data::Dumper;
 
-my $DEBUG = 1;
+my $DEBUG = 0;
 
 # The board - domains:
 # s - single t -double, u-triple, w-quatro
@@ -119,6 +119,7 @@ sub get_position_neighbours {
 		for my $neigbour (grep {$borders{$_}} keys %borders){
 			$neighbours{$position_nbr + $neigbour} = 1;
 		}
+        $neighbours{$position_nbr} = 1; # File itself
 	}
 	return sort keys %neighbours if keys %neighbours > 1; # List of parameters
 	return first keys %neighbours; # Only one param
@@ -166,9 +167,29 @@ sub domain_for_variable {
 #
 
 sub assigment_step {
-	my @variables = (@_);
-	my @assigned_variables  = grep {!m/?/} @variables;
-	my @unasigned_variables = grep { m/?/} @variables;
+	my (@variables) = (@_);
+    say "variables: @variables" if $DEBUG;
+	my @unasigned_variables = grep { m/[?]/} @variables;
+    say "unasigned variables: @unasigned_variables" if $DEBUG;
+    return @variables if (scalar @unasigned_variables eq 0); # nothing to do
+
+	my @assigned_variables = grep {!m/[?]/} @variables;
+    my @return_variables;
+
+    # At this moment get first one, leter it would be good to have MCV 
+    my $selected_variable = shift @unasigned_variables;
+    say "\$selected_variable $selected_variable" if $DEBUG;
+
+    # Another simply take first, that take best heuristic...
+    say "domain for variable: " . join(":",domain_for_variable(substr($selected_variable,0,1),domain_for_used_values(@assigned_variables))) if $DEBUG;
+
+    for my $selected_value (domain_for_variable(substr($selected_variable,0,1),domain_for_used_values(@assigned_variables))){
+        @return_variables = assigment_step( @assigned_variables, $selected_value, @unasigned_variables );
+        if (! grep {m/[?]/} @return_variables) { # All values set
+            return @return_variables; # Short circuit for found solution
+        }
+    }
+    return @variables;
 }
 
 sub solve_the_puzzle {
@@ -178,8 +199,13 @@ sub solve_the_puzzle {
 	push @variables, "t?" for (1 .. $t_count); 
 	push @variables, "s?" for (1 .. $s_count); 
 
-	say "@variables";
+    say "stp variables: @variables";
+	my @result = assigment_step(@variables);
+
 }
+
+say join (":", solve_the_puzzle());
+
 __END__
 
 =head1 Battleship CSP solver
